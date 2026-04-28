@@ -10,13 +10,14 @@
       window.__ECTSFIXER_PENDING_NEW_TAB = false;
       try {
         const full = new URL(url, location.origin).toString();
-        window.open(full, '_blank', 'noopener');
+        // Stuur naar het isolated content script — die opent de tab via
+        // chrome.tabs.create met active:false zodat de focus hier blijft.
+        window.dispatchEvent(new CustomEvent('ECTSFIXER_OPEN_BG_TAB', { detail: { url: full } }));
       } catch (_) {}
 
-      // Push wel door zodat Angular Router intern consistent blijft,
-      // en haal de extra entry direct weer weg via popstate. Angular
-      // Router luistert naar popstate en navigeert terug naar de
-      // huidige route — dat herstelt ook de view in deze tab.
+      // Laat pushState toch gebeuren zodat Angular Router intern consistent
+      // is, en spring direct terug. Een UI-snapshot/restore in content.js
+      // herstelt daarna de open accordions en scrollpositie.
       const ret = origPushState(state, title, url);
       Promise.resolve().then(() => {
         try { history.back(); } catch (_) {}

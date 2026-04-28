@@ -1,8 +1,11 @@
 {
   "manifest_version": 3,
   "name": "ECTS Fixer",
-  "version": "0.2.0",
-  "description": "Kleine helper voor ects.ap.be (academiejaar autoset, open vak in nieuwe tab).",
+  "version": "0.3.0",
+  "description": "Kleine helper voor ects.ap.be (academiejaar autoset, open vak in achtergrondtab).",
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
       "matches": ["https://ects.ap.be/*", "http://ects.ap.be/*"],

@@ -10,10 +10,12 @@ domeinnaam.
   academiejaar-dropdown standaard op het ingestelde jaar gezet (default
   `2025-2026`). Handig zolang de site bij elke load weer naar het lopende
   academiejaar springt.
-- **"Open in nieuwe tab"-knop bij elk vak.** Op een programma-pagina (bv.
+- **"Open in achtergrondtab"-knop bij elk vak.** Op een programma-pagina (bv.
   `/ects/opleiding/<jaar>/<code>/<id>`) verschijnt naast elke vak-rij een klein
-  knopje. Een klik opent dat vak in een nieuwe tab; de huidige tab blijft op
-  het programma-overzicht staan.
+  knopje. Een klik opent dat vak in een nieuwe tab op de achtergrond — de
+  focus blijft op de huidige tab. De open accordions en scrollpositie worden
+  via een snapshot/restore zoveel mogelijk behouden (er zit een korte flicker
+  tussen omdat Angular Router intern toch een view-swap forceert).
 
 Beide gedragingen zijn afzonderlijk uit te schakelen via de opties-pagina van
 de extensie.

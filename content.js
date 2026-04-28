@@ -16,6 +16,16 @@ function visible(el) {
   return cs.visibility !== 'hidden' && cs.display !== 'none';
 }
 
+function fireClick(el) {
+  try { el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {}
+  const opts = { bubbles: true, cancelable: true, view: window, button: 0 };
+  try { el.dispatchEvent(new MouseEvent('pointerdown', opts)); } catch (_) {}
+  try { el.dispatchEvent(new MouseEvent('mousedown', opts)); } catch (_) {}
+  try { el.dispatchEvent(new MouseEvent('pointerup', opts)); } catch (_) {}
+  try { el.dispatchEvent(new MouseEvent('mouseup', opts)); } catch (_) {}
+  try { el.click(); } catch (_) {}
+}
+
 // ---------- academiejaar dropdown ----------
 
 function targetRegex(targetYear) {
@@ -44,16 +54,6 @@ function findYearTrigger() {
     }
   }
   return null;
-}
-
-function fireClick(el) {
-  try { el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (_) {}
-  const opts = { bubbles: true, cancelable: true, view: window, button: 0 };
-  try { el.dispatchEvent(new MouseEvent('pointerdown', opts)); } catch (_) {}
-  try { el.dispatchEvent(new MouseEvent('mousedown', opts)); } catch (_) {}
-  try { el.dispatchEvent(new MouseEvent('pointerup', opts)); } catch (_) {}
-  try { el.dispatchEvent(new MouseEvent('mouseup', opts)); } catch (_) {}
-  try { el.click(); } catch (_) {}
 }
 
 async function waitForOption(re, timeoutMs = 4000) {
@@ -111,7 +111,54 @@ async function runYearLoop(settings) {
   if (settings.debug && !yearDone) LOG('year loop gave up');
 }
 
-// ---------- open in nieuwe tab knoppen ----------
+// ---------- UI snapshot/restore ----------
+
+function normText(s) {
+  return (s || '').trim().replace(/\s+/g, ' ');
+}
+
+function snapshotState() {
+  const opened = [];
+  for (const h of document.querySelectorAll('p-accordion-header[aria-expanded="true"]')) {
+    const t = normText(h.textContent);
+    if (t && t.length <= 300) opened.push(t);
+  }
+  return { opened, scrollY: Math.round(window.scrollY) };
+}
+
+function applySnapshot(snap) {
+  if (!snap || !snap.opened) return;
+  for (const wanted of snap.opened) {
+    const closed = document.querySelectorAll('p-accordion-header[aria-expanded="false"]');
+    for (const h of closed) {
+      if (normText(h.textContent) === wanted) {
+        fireClick(h);
+        break;
+      }
+    }
+  }
+}
+
+function setScroll(y) {
+  try { window.scrollTo({ top: y, behavior: 'instant' }); }
+  catch (_) { window.scrollTo(0, y); }
+}
+
+function scheduleRestore(snap) {
+  if (!snap) return;
+  // Probeer accordions meermaals open te zetten (parents eerst, dan kinderen
+  // wanneer die in de DOM verschijnen). Idempotent dankzij de "already open"-check.
+  for (const t of [60, 150, 300, 500, 800, 1200]) {
+    setTimeout(() => applySnapshot(snap), t);
+  }
+  // Scroll na elke ronde herstellen, want Angular kan tijdens de view-swap
+  // naar boven springen.
+  for (const t of [200, 500, 900, 1300]) {
+    setTimeout(() => setScroll(snap.scrollY || 0), t);
+  }
+}
+
+// ---------- open in achtergrondtab knoppen ----------
 
 const BTN_CLASS = 'ectsfixer-open-tab-btn';
 const BTN_STYLE_ID = 'ectsfixer-style';
@@ -151,16 +198,14 @@ function injectStyle() {
 
 function decorateOne(div) {
   if (div.dataset.ectsfixerEnhanced === '1') return;
-  // Alleen vak-callouts (de container-callout heeft 'linkEffect' niet)
   if (!div.classList.contains('linkEffect')) return;
-
   div.dataset.ectsfixerEnhanced = '1';
 
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = BTN_CLASS;
-  btn.title = 'Open in nieuwe tab';
-  btn.setAttribute('aria-label', 'Open in nieuwe tab');
+  btn.title = 'Open in achtergrondtab';
+  btn.setAttribute('aria-label', 'Open in achtergrondtab');
   btn.innerHTML = ICON_SVG;
 
   const stop = (e) => { e.stopPropagation(); };
@@ -171,17 +216,17 @@ function decorateOne(div) {
   btn.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
+    const snap = snapshotState();
     window.dispatchEvent(new CustomEvent('ECTSFIXER_PREP_NEW_TAB'));
-    // Trigger Angular's klik-handler op de div
     setTimeout(() => fireClick(div), 0);
+    scheduleRestore(snap);
   }, true);
 
   div.appendChild(btn);
 }
 
 function decorateAll() {
-  const divs = document.querySelectorAll('div.bs-callout.linkEffect');
-  for (const d of divs) decorateOne(d);
+  for (const d of document.querySelectorAll('div.bs-callout.linkEffect')) decorateOne(d);
 }
 
 let decorateTimer;
@@ -196,25 +241,27 @@ function startNewTabButtons(settings) {
   if (!settings.addNewTabButtons) return;
   injectStyle();
   decorateAll();
-
-  // Volg verdere DOM-mutaties (accordion openen, route-wijzigingen) met
-  // een gedebouncede observer; idempotent dankzij de data-attribuut.
   const obs = new MutationObserver(() => scheduleDecorate());
   obs.observe(document.body, { childList: true, subtree: true });
 }
+
+// Relay van page-hook (main world) naar service worker (achtergrondtab openen).
+window.addEventListener('ECTSFIXER_OPEN_BG_TAB', (e) => {
+  const url = e && e.detail && e.detail.url;
+  if (typeof url !== 'string' || !url) return;
+  try {
+    chrome.runtime.sendMessage({ type: 'OPEN_BG_TAB', url });
+  } catch (_) {}
+});
 
 // ---------- main ----------
 
 (async () => {
   let settings;
-  try {
-    settings = await chrome.storage.sync.get(DEFAULTS);
-  } catch (_) {
-    settings = DEFAULTS;
-  }
+  try { settings = await chrome.storage.sync.get(DEFAULTS); }
+  catch (_) { settings = DEFAULTS; }
   if (settings.debug) LOG('booting on', location.href, settings);
 
-  // Beide features parallel starten; ze hinderen elkaar niet.
   runYearLoop(settings).catch(e => settings.debug && LOG('year fatal', e));
   startNewTabButtons(settings);
 })();
