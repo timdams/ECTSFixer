@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <title>ECTS Fixer – instellingen</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 16px; min-width: 320px; }
+    h1 { font-size: 16px; margin-top: 0; }
+    .row { margin-bottom: 12px; }
+    label { display: flex; align-items: center; gap: 8px; }
+    input[type=text] { padding: 4px 6px; width: 140px; }
+    .saved { color: #2a7; font-size: 12px; height: 16px; }
+    .hint { color: #666; font-size: 12px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h1>ECTS Fixer</h1>
+
+  <div class="row">
+    <label>
+      <input type="checkbox" id="autoSetYear">
+      Academiejaar automatisch instellen bij laden
+    </label>
+  </div>
+
+  <div class="row">
+    <label>
+      Doel-academiejaar:
+      <input type="text" id="targetYear" placeholder="2025-2026">
+    </label>
+    <div class="hint">Formaat: JJJJ-JJJJ (bv. 2025-2026)</div>
+  </div>
+
+  <div class="row">
+    <label>
+      <input type="checkbox" id="addNewTabButtons">
+      "Open in nieuwe tab"-knop bij elk vak
+    </label>
+  </div>
+
+  <div class="row">
+    <label>
+      <input type="checkbox" id="debug">
+      Debug-logging in console
+    </label>
+  </div>
+
+  <div class="saved" id="saved"></div>
+
+  <script src="options.js"></script>
+</body>
+</html>
